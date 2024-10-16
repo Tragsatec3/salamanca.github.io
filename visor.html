@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Salamanca</title>
+  
+  <!-- estilos CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+
+  <style>
+    #map { height: 800px; width: 100%; }
+
+
+  </style>
+</head>
+
+<body>
+<h1>VISOR SALAMANCA: CATASTRO Y CALLEJEROS</h1>
+<div id="map"></div>
+
+<!-- Carga de plugins -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="leaflet.wms.js"></script>
+
+
+
+<!-- rutas de los archivos js usados para cada capa -->
+<script type="text/javascript" src="salamanca.js"></script>
+<script type="text/javascript" src="municipios.js"></script>
+
+<script src="https://unpkg.com/shapefile@latest/dist/shapefile.js"></script>
+
+<!-- Mapa -->
+<script>
+  // Mapa centrado en Salamanca
+  var map = L.map('map').setView([40.98464, -5.5862], 9);
+
+  // Mapas base
+  var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  });
+
+  var catastroLayer = L.tileLayer.wms("http://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx?", {
+	   layers: "Catastro",//nombre de la capa (ver get capabilities)
+	   format: 'image/jpeg',
+	   transparent: true,
+	   version: '1.1.1',//wms version (ver get capabilities)
+	   attribution: "DIRECCION GENERAL DEL CATASTRO"
+	});
+
+  var googleLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=es&z={z}&x={x}&y={y}', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.google.com/intl/es/help/terms_maps.html">Google Maps</a>'
+  }).addTo(map);
+  
+
+
+  // Estilos
+  var estilo_1 = {
+    "color": "#feb24c",
+    "weight": 4,
+    "opacity": 0.8
+  };
+
+  var estilo_2 = {
+    "color": "#3182bd",
+    "weight": 1,
+    "opacity": 3.5
+  };
+
+  // Capas
+  var salamancaLayer = L.geoJson(salamanca, {
+    onEachFeature: onEachLimites,
+    style: estilo_1,
+  }).addTo(map);
+
+  var muniLayer = L.geoJson(municipios, {
+    onEachFeature: onEachFeature,
+    style: estilo_2,
+  });
+
+
+  // Mapas agregados en una sola clase
+  var baseMaps = {
+    "Google Maps": googleLayer,
+    "Open Street Map": osmLayer,
+    "Catastro": catastroLayer
+  };
+
+  // Provincias y municipios en una sola clase
+  var overlay = {
+    "Provincia de Salamanca": salamancaLayer,
+    "Municipios": muniLayer
+  };
+
+  // Funciones de popup para cada capa
+  function onEachFeature(feature, layer) {
+    var popupContent = feature.properties.D_MUN || "Sin nombre";
+    layer.bindPopup(popupContent);
+  }
+
+  function onEachLimites(feature, layer) {
+    var popupContent = "<b>Salamanca</b>";
+    layer.bindPopup(popupContent);
+  }
+  
+
+//control escala
+L.control.scale({
+    metric: true,
+    imperial: false,
+    maxWidth: 300,
+    position: 'bottomleft'
+}).addTo(map);
+
+ // control de los mapas base  
+ L.control.layers(baseMaps, null, {
+    position: 'bottomright',
+    collapsed: false
+  }).addTo(map);
+
+  // Control de capas
+  L.control.layers(null, overlay, {
+    position: 'topright',
+    collapsed: false
+  }).addTo(map)
+
+
+// Evento de clic en el mapa
+map.on('click', function(e) {
+  var url = catastroLayer.getFeatureInfoUrl(e.latlng, {
+    'info_format': 'application/json',
+    'query_layers': 'Catastro',
+    'buffer': 5,
+    'layers': 'Catastro',
+  });
+
+  if (url) {
+  fetch(url)
+  .then(response => response.json())
+  .then(data => {
+  if (data.features.length > 0) {
+    var properties = data.features[0].properties;
+    var referencia = properties.TXTPARCELA;
+  L.popup()
+  .setLatLng(e.latlng)
+  .setContent("Referencia Catastral: " + referencia)
+  .openOn(map);
+ } else {
+  alert("No se encontró información en esta ubicación.");
+  }
+  })
+  .catch(error => console.error('Error al obtener información:', error));
+  }
+});
+
+</script>
+</body>
+</html>
